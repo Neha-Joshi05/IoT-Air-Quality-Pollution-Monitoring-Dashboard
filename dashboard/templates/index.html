@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Air Quality Monitor</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:     #0d1117;
+      --card:   #161b22;
+      --border: rgba(48,54,61,0.9);
+      --text:   #e6edf3;
+      --muted:  #8b949e;
+      --green:  #3fb950;
+      --yellow: #d29922;
+      --orange: #f0883e;
+      --red:    #f85149;
+      --purple: #bc8cff;
+      --blue:   #58a6ff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Header ───────────────────────────────── */
+    header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    header h1 { font-size: 1.2rem; }
+
+    .live-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      background: var(--green);
+      border-radius: 50%;
+      margin-right: 6px;
+      animation: blink 1.5s infinite;
+    }
+
+    @keyframes blink {
+      0%,100% { opacity:1; }
+      50%      { opacity:0.3; }
+    }
+
+    /* ── Main Layout ──────────────────────────── */
+    main {
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 24px 20px;
+    }
+
+    /* ── AQI Hero Card ────────────────────────── */
+    .aqi-hero {
+      border-radius: 16px;
+      padding: 28px 32px;
+      margin-bottom: 24px;
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: background 0.5s, border-color 0.5s;
+    }
+
+    .aqi-number {
+      font-size: 5rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .aqi-label  { font-size: 1.4rem; font-weight: 600; margin-top: 6px; }
+    .aqi-sub    { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+    .aqi-scale  {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .scale-item {
+      padding: 5px 12px;
+      border-radius: 100px;
+      font-size: 12px;
+      font-weight: 600;
+      opacity: 0.5;
+      transition: opacity 0.3s;
+    }
+    .scale-item.active { opacity: 1; transform: scale(1.05); }
+
+    /* ── Stats Grid ───────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      transition: border-color 0.2s;
+    }
+
+    .stat-card:hover { border-color: var(--blue); }
+
+    .stat-icon  { font-size: 1.5rem; margin-bottom: 8px; }
+    .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .stat-value { font-size: 1.8rem; font-weight: 700; }
+    .stat-unit  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* ── Charts + Alerts Grid ─────────────────── */
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 360px;
+      gap: 16px;
+    }
+
+    @media (max-width: 1100px) {
+      .bottom-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 700px) {
+      .bottom-grid { grid-template-columns: 1fr; }
+    }
+
+    .chart-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+    }
+
+    .chart-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 14px;
+      font-weight: 600;
+    }
+
+    /* ── Alerts Panel ─────────────────────────── */
+    .alerts-panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .alert-item {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      border-left: 3px solid;
+      margin-bottom: 8px;
+    }
+
+    .alert-hazard  { background: rgba(126,0,35,0.15);   border-color: #7e0023; color: #ff6b8a; }
+    .alert-warning { background: rgba(248,81,73,0.1);   border-color: var(--red);    color: var(--red);    }
+    .alert-notice  { background: rgba(210,153,34,0.1);  border-color: var(--yellow); color: var(--yellow); }
+    .alert-ok      { background: rgba(63,185,80,0.1);   border-color: var(--green);  color: var(--green);  }
+
+    .timestamp-bar {
+      text-align: right;
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1><span class="live-dot"></span>IoT Air Quality & Pollution Monitor</h1>
+  <span style="font-size:12px; color:var(--muted)" id="last-updated">Connecting...</span>
+</header>
+
+<main>
+
+  <!-- ── AQI Hero ──────────────────────────────── -->
+  <div class="aqi-hero" id="aqi-hero">
+    <div>
+      <div style="font-size:13px; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.06em">Air Quality Index</div>
+      <div class="aqi-number" id="aqi-number">--</div>
+      <div class="aqi-label"  id="aqi-label">Loading...</div>
+      <div class="aqi-sub"    id="aqi-sub">Based on PM2.5 concentration</div>
+    </div>
+    <div class="aqi-scale">
+      <div class="scale-item" style="background:#00e400; color:#000" data-cat="Good">Good</div>
+      <div class="scale-item" style="background:#ffff00; color:#000" data-cat="Moderate">Moderate</div>
+      <div class="scale-item" style="background:#ff7e00; color:#fff" data-cat="Unhealthy for Sensitive">Sensitive</div>
+      <div class="scale-item" style="background:#ff0000; color:#fff" data-cat="Unhealthy">Unhealthy</div>
+      <div class="scale-item" style="background:#8f3f97; color:#fff" data-cat="Very Unhealthy">V. Unhealthy</div>
+      <div class="scale-item" style="background:#7e0023; color:#fff" data-cat="Hazardous">Hazardous</div>
+    </div>
+  </div>
+
+  <!-- ── Stats Cards ───────────────────────────── -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon">🌫️</div>
+      <div class="stat-label">PM2.5</div>
+      <div class="stat-value" id="val-pm25" style="color:var(--orange)">--</div>
+      <div class="stat-unit">µg/m³</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">💨</div>
+      <div class="stat-label">PM10</div>
+      <div class="stat-value" id="val-pm10" style="color:var(--yellow)">--</div>
+      <div class="stat-unit">µg/m³</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🏭</div>
+      <div class="stat-label">CO2</div>
+      <div class="stat-value" id="val-co2" style="color:var(--purple)">--</div>
+      <div class="stat-unit">ppm</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🔬</div>
+      <div class="stat-label">Gas Index</div>
+      <div class="stat-value" id="val-gas" style="color:var(--red)">--</div>
+      <div class="stat-unit">ADC (0-1023)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🌡️</div>
+      <div class="stat-label">Temperature</div>
+      <div class="stat-value" id="val-temp" style="color:var(--red)">--</div>
+      <div class="stat-unit">°C</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">💧</div>
+      <div class="stat-label">Humidity</div>
+      <div class="stat-value" id="val-hum" style="color:var(--blue)">--</div>
+      <div class="stat-unit">%</div>
+    </div>
+  </div>
+
+  <!-- ── Charts + Alerts ───────────────────────── -->
+  <div class="bottom-grid">
+
+    <!-- PM2.5 & PM10 Chart -->
+    <div class="chart-card">
+      <div class="chart-title">PM2.5 & PM10 Trend (last 20 readings)</div>
+      <canvas id="pmChart" height="200"></canvas>
+    </div>
+
+    <!-- AQI + CO2 Chart -->
+    <div class="chart-card">
+      <div class="chart-title">AQI & CO2 Trend (last 20 readings)</div>
+      <canvas id="aqiChart" height="200"></canvas>
+    </div>
+
+    <!-- Alerts Panel -->
+    <div class="alerts-panel">
+      <div class="chart-title">Active Alerts</div>
+      <div id="alerts-container">
+        <div class="alert-item alert-ok">Waiting for data...</div>
+      </div>
+
+      <!-- AQI Reference -->
+      <div style="margin-top:auto; padding-top:16px; border-top:1px solid var(--border);">
+        <div class="chart-title" style="margin-bottom:10px;">AQI Scale Reference</div>
+        <div style="display:flex; flex-direction:column; gap:5px; font-size:12px;">
+          <div style="display:flex; justify-content:space-between;"><span style="color:#00e400">● Good</span><span>0-50</span></div>
+          <div style="display:flex; justify-content:space-between;"><span style="color:#ffff00">● Moderate</span><span>51-100</span></div>
+          <div style="display:flex; justify-content:space-between;"><span style="color:#ff7e00">● Unhealthy (Sensitive)</span><span>101-150</span></div>
+          <div style="display:flex; justify-content:space-between;"><span style="color:#ff0000">● Unhealthy</span><span>151-200</span></div>
+          <div style="display:flex; justify-content:space-between;"><span style="color:#8f3f97">● Very Unhealthy</span><span>201-300</span></div>
+          <div style="display:flex; justify-content:space-between;"><span style="color:#ff6b8a">● Hazardous</span><span>301-500</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<script>
+// ── Chart Options ─────────────────────────────────────────────
+const baseOptions = {
+  responsive: true,
+  animation: { duration: 400 },
+  plugins: { legend: { labels: { color: '#8b949e', font: { size: 11 } } } },
+  scales: {
+    x: { ticks: { color: '#8b949e', font: { size: 10 }, maxTicksLimit: 6 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+    y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+  }
+};
+
+// PM Chart
+const pmChart = new Chart(document.getElementById('pmChart'), {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      { label: 'PM2.5 µg/m³', data: [], borderColor: '#f0883e', backgroundColor: 'rgba(240,136,62,0.1)', fill: true, tension: 0.4, pointRadius: 2 },
+      { label: 'PM10 µg/m³',  data: [], borderColor: '#d29922', backgroundColor: 'rgba(210,153,34,0.1)',  fill: true, tension: 0.4, pointRadius: 2 }
+    ]
+  },
+  options: baseOptions
+});
+
+// AQI Chart
+const aqiChart = new Chart(document.getElementById('aqiChart'), {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      { label: 'AQI',     data: [], borderColor: '#ff5555', backgroundColor: 'rgba(255,85,85,0.1)', fill: true, tension: 0.4, pointRadius: 2 },
+      { label: 'CO2 ppm', data: [], borderColor: '#bc8cff', backgroundColor: 'rgba(188,140,255,0.1)', fill: true, tension: 0.4, pointRadius: 2, yAxisID: 'y2' }
+    ]
+  },
+  options: {
+    ...baseOptions,
+    scales: {
+      ...baseOptions.scales,
+      y2: { position: 'right', ticks: { color: '#bc8cff', font: { size: 10 } }, grid: { display: false } }
+    }
+  }
+});
+
+function pushChart(chart, label, ...values) {
+  chart.data.labels.push(label);
+  values.forEach((v, i) => chart.data.datasets[i].data.push(v));
+  if (chart.data.labels.length > 20) {
+    chart.data.labels.shift();
+    chart.data.datasets.forEach(d => d.data.shift());
+  }
+  chart.update();
+}
+
+// ── AQI Hero background update ────────────────────────────────
+function updateAQIHero(aqi, category, color) {
+  const hero = document.getElementById('aqi-hero');
+  const num  = document.getElementById('aqi-number');
+  const lbl  = document.getElementById('aqi-label');
+
+  hero.style.background = `${color}18`;
+  hero.style.borderColor = `${color}50`;
+  num.style.color  = color;
+  num.textContent  = aqi;
+  lbl.textContent  = category;
+  lbl.style.color  = color;
+
+  // Highlight active scale item
+  document.querySelectorAll('.scale-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.cat === category);
+  });
+}
+
+// ── Alert classifier ──────────────────────────────────────────
+function alertClass(msg) {
+  const m = msg.toUpperCase();
+  if (m.includes('HAZARD'))  return 'alert-hazard';
+  if (m.includes('ALERT'))   return 'alert-warning';
+  if (m.includes('WARNING')) return 'alert-warning';
+  if (m.includes('NOTICE'))  return 'alert-notice';
+  return 'alert-ok';
+}
+
+// ── Poll API every 3 seconds ──────────────────────────────────
+async function fetchLatest() {
+  try {
+    const res  = await fetch('/api/latest');
+    const json = await res.json();
+    const d    = json.data;
+    if (!d.timestamp) return;
+
+    // Update stat cards
+    document.getElementById('val-pm25').textContent = d.pm25;
+    document.getElementById('val-pm10').textContent = d.pm10;
+    document.getElementById('val-co2').textContent  = d.co2_ppm;
+    document.getElementById('val-gas').textContent  = d.gas_index;
+    document.getElementById('val-temp').textContent = d.temperature;
+    document.getElementById('val-hum').textContent  = d.humidity;
+    document.getElementById('last-updated').textContent = 'Updated: ' + d.timestamp;
+
+    // Update AQI hero
+    updateAQIHero(d.aqi, d.category, d.aqi_color);
+
+    // Update alerts
+    const alertsDiv = document.getElementById('alerts-container');
+    if (json.alerts.length === 0) {
+      alertsDiv.innerHTML = '<div class="alert-item alert-ok">All parameters within safe limits</div>';
+    } else {
+      alertsDiv.innerHTML = json.alerts.map(a =>
+        `<div class="alert-item ${alertClass(a)}">${a}</div>`
+      ).join('');
+    }
+
+    // Push to charts
+    const t = d.timestamp.split(' ')[1].substring(0, 5);
+    pushChart(pmChart,  t, d.pm25, d.pm10);
+    pushChart(aqiChart, t, d.aqi,  d.co2_ppm);
+
+  } catch(e) { console.error(e); }
+}
+
+fetchLatest();
+setInterval(fetchLatest, 3000);
+</script>
+</body>
+</html>
