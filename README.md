@@ -8,7 +8,7 @@
 ![AQI](https://img.shields.io/badge/AQI-EPA%20Standard-orange)
 
 ## 🌐 Live Demo
-👉 **[https://iot-air-quality-monitor.onrender.com](https://iot-air-quality-monitor.onrender.com)**
+👉 **https://iot-air-quality-pollution-monitoring.onrender.com**
 
 ---
 
